@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf8" />
+  <title>HealthcareMaaS Gateway Reservations API</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="redoc-container"></div>
+  <script src="https://cdn.redocly.com/redoc/v2.5.0/bundles/redoc.standalone.js"></script>
+  <script>
+    const spec = {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "HealthcareMaaS Gateway Reservations API",
+        "description": "デマンドバスシステム標準化APIと連携し、病院への往路・復路の配車予約管理機能を提供する、ヘルスケアMaaSゲートウェイAPIです。",
+        "version": "1.0.0"
+      },
+      "servers": [
+        {
+          "url": "https://{api_id}.execute-api.ap-northeast-1.amazonaws.com/{stage}",
+          "description": "AWS API Gateway",
+          "variables": {
+            "api_id": {
+              "default": "xxxxxxxxxx",
+              "description": "API Gateway ID"
+            },
+            "stage": {
+              "default": "dev",
+              "description": "デプロイステージ"
+            }
+          }
+        }
+      ],
+      "paths": {
+        "/reservations": {
+          "post": {
+            "tags": ["reservations"],
+            "summary": "配車予約検索・確定API",
+            "description": "配車予約を検索し、確定します。\n\n- 到着希望日時（診察日時）を到着予定時刻とした行きの予約（ご自宅→病院）の予約を確定\n- 出発希望日時（離院日時）を出発予定時刻とした帰りの予約（病院→ご自宅）の予約を確定\n- 立ち寄り場所を指定した場合、立ち寄り場所を中継地点として考慮した予約を確定（病院→立ち寄り場所→ご自宅）",
+            "operationId": "createReservation",
+            "security": [{"ApiKeyAuth": []}],
+            "requestBody": {
+              "description": "配車予約作成リクエスト",
+              "required": true,
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": ["user_id"],
+                    "properties": {
+                      "user_id": {
+                        "type": "string",
+                        "description": "利用者ID（PHRシステムにおける患者IDを想定）",
+                        "example": "123456"
+                      },
+                      "arrival_demand_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "到着希望日時（ISO8601形式）。この時刻に到着するように行きの予約（ご自宅→病院）を確定します。未来の日時を指定する必要があります。",
+                        "example": "2025-07-03T10:15:30+09:00"
+                      },
+                      "departure_demand_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "出発希望日時（ISO8601形式）。この時刻に出発するように帰りの予約（病院→ご自宅）を確定します。未来の日時を指定する必要があります。",
+                        "example": "2025-07-03T15:15:30+09:00"
+                      },
+                      "way_points_id": {
+                        "type": "integer",
+                        "description": "立ち寄り場所の内部コードID。指定した場合、帰りの予約が「病院→立ち寄り場所→ご自宅」の2つに分割されます。",
+                        "example": 1
+                      },
+                      "stay_duration_minutes": {
+                        "type": "integer",
+                        "description": "立ち寄り場所での滞在時間（分）。way_points_idと併用する必要があります。",
+                        "example": 30
+                      }
+                    }
+                  },
+                  "example": {
+                    "user_id": "123456",
+                    "arrival_demand_time": "2025-07-03T10:15:30+09:00",
+                    "departure_demand_time": "2025-07-03T15:15:30+09:00",
+                    "way_points_id": 1,
+                    "stay_duration_minutes": 30
+                  }
+                }
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "予約一覧レスポンス",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "reservations_list": {
+                          "type": "array",
+                          "description": "予約情報の配列。立ち寄り場所がリクエストに含まれている場合は最大3件、含まれていない場合は最大2件の予約を返却。",
+                          "items": {
+                            "$ref": "#/components/schemas/Reservation"
+                          }
+                        }
+                      }
+                    },
+                    "example": {
+                      "reservations_list": [
+                        {
+                          "reservation_id": "111111",
+                          "departure_platform_name": "ご自宅",
+                          "departure_time": "2025-07-03T09:15:30+09:00",
+                          "arrival_platform_name": "徳島県県立中央病院",
+                          "arrival_time": "2025-07-03T10:00:00+09:00",
+                          "reservation_type": 1
+                        },
+                        {
+                          "reservation_id": "111112",
+                          "departure_platform_name": "徳島県県立中央病院",
+                          "departure_time": "2025-07-03T15:15:30+09:00",
+                          "arrival_platform_name": "ひかり薬局 城東店",
+                          "arrival_time": "2025-07-03T15:45:00+09:00",
+                          "reservation_type": 3
+                        },
+                        {
+                          "reservation_id": "111113",
+                          "departure_platform_name": "ひかり薬局 城東店",
+                          "departure_time": "2025-07-03T16:15:00+09:00",
+                          "arrival_platform_name": "ご自宅",
+                          "arrival_time": "2025-07-03T16:45:00+09:00",
+                          "reservation_type": 4
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "400": {
+                "description": "Bad Request - パラメータ不正",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "user_id is required and must be a string"
+                    }
+                  }
+                }
+              },
+              "404": {
+                "description": "Not Found - 指定されたリソースなし",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "No outbound reservation candidates found"
+                    }
+                  }
+                }
+              },
+              "500": {
+                "description": "Internal Server Error - サーバー処理異常",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "Internal server error"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "patch": {
+            "tags": ["reservations"],
+            "summary": "配車予約変更API",
+            "description": "確定済みの配車予約の内容を変更します。\n\n既存の予約をキャンセルし、新しい条件で予約を再作成します。\n変更可能な項目：\n- 行きの予約\n- 帰りの予約\n- 立ち寄り場所\n- 立ち寄り場所の滞在時間",
+            "operationId": "updateReservation",
+            "security": [{"ApiKeyAuth": []}],
+            "requestBody": {
+              "description": "配車予約変更リクエスト",
+              "required": true,
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": ["user_id", "reservation_ids"],
+                    "properties": {
+                      "user_id": {
+                        "type": "string",
+                        "description": "利用者ID（PHRシステムにおける患者IDを想定）",
+                        "example": "123456"
+                      },
+                      "reservation_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "description": "変更対象の配車予約IDリスト。1〜3件のIDを指定できます。",
+                        "example": [111111, 111112]
+                      },
+                      "arrival_demand_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "変更後の到着希望日時（ISO8601形式）",
+                        "example": "2025-07-03T11:15:30+09:00"
+                      },
+                      "departure_demand_time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "変更後の出発希望日時（ISO8601形式）",
+                        "example": "2025-07-03T16:15:30+09:00"
+                      },
+                      "way_points_id": {
+                        "type": "integer",
+                        "description": "変更後の立ち寄り場所の内部コードID",
+                        "example": 2
+                      },
+                      "stay_duration_minutes": {
+                        "type": "integer",
+                        "description": "変更後の立ち寄り場所での滞在時間（分）",
+                        "example": 45
+                      }
+                    }
+                  },
+                  "example": {
+                    "user_id": "123456",
+                    "reservation_ids": [111111, 111112],
+                    "arrival_demand_time": "2025-07-03T11:15:30+09:00",
+                    "departure_demand_time": "2025-07-03T16:15:30+09:00",
+                    "way_points_id": 2,
+                    "stay_duration_minutes": 45
+                  }
+                }
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "予約一覧レスポンス",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "reservations_list": {
+                          "type": "array",
+                          "description": "変更後の予約情報の配列",
+                          "items": {
+                            "$ref": "#/components/schemas/Reservation"
+                          }
+                        }
+                      }
+                    },
+                    "example": {
+                      "reservations_list": [
+                        {
+                          "reservation_id": "222221",
+                          "departure_platform_name": "ご自宅",
+                          "departure_time": "2025-07-03T10:15:30+09:00",
+                          "arrival_platform_name": "徳島県県立中央病院",
+                          "arrival_time": "2025-07-03T11:00:00+09:00",
+                          "reservation_type": 1
+                        },
+                        {
+                          "reservation_id": "222222",
+                          "departure_platform_name": "徳島県県立中央病院",
+                          "departure_time": "2025-07-03T16:15:30+09:00",
+                          "arrival_platform_name": "ぐんも調剤薬局 県中店",
+                          "arrival_time": "2025-07-03T16:45:00+09:00",
+                          "reservation_type": 3
+                        },
+                        {
+                          "reservation_id": "222223",
+                          "departure_platform_name": "ぐんも調剤薬局 県中店",
+                          "departure_time": "2025-07-03T17:30:00+09:00",
+                          "arrival_platform_name": "ご自宅",
+                          "arrival_time": "2025-07-03T18:00:00+09:00",
+                          "reservation_type": 4
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "400": {
+                "description": "Bad Request - パラメータ不正",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "reservation_ids is required and must be an array"
+                    }
+                  }
+                }
+              },
+              "404": {
+                "description": "Not Found - 指定された予約IDが存在しない",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "Reservation not found: 111111"
+                    }
+                  }
+                }
+              },
+              "500": {
+                "description": "Internal Server Error - サーバー処理異常",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "Internal server error"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "delete": {
+            "tags": ["reservations"],
+            "summary": "配車予約キャンセルAPI",
+            "description": "配車予約をキャンセルします。\n\n診察キャンセル時に紐づく配車予約をキャンセルするために使用します。\n1回の診察で最大3つの予約（往路、復路1、復路2）があるため、それらを一括でキャンセルできます。",
+            "operationId": "deleteReservation",
+            "security": [{"ApiKeyAuth": []}],
+            "requestBody": {
+              "description": "配車予約キャンセルリクエスト",
+              "required": true,
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": ["user_id", "reservation_ids"],
+                    "properties": {
+                      "user_id": {
+                        "type": "string",
+                        "description": "利用者ID（PHRシステムにおける患者IDを想定）",
+                        "example": "123456"
+                      },
+                      "reservation_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "description": "キャンセル対象の配車予約IDリスト。1〜3件のIDを指定できます。",
+                        "example": [111111, 111112, 111113]
+                      }
+                    }
+                  },
+                  "example": {
+                    "user_id": "123456",
+                    "reservation_ids": [111111, 111112, 111113]
+                  }
+                }
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "正常応答（ボディなし）"
+              },
+              "400": {
+                "description": "Bad Request - パラメータ不正",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "reservation_ids array must have at least 1 element"
+                    }
+                  }
+                }
+              },
+              "404": {
+                "description": "Not Found - 指定された予約IDが存在しない",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "Reservation not found: 111111"
+                    }
+                  }
+                }
+              },
+              "500": {
+                "description": "Internal Server Error - サーバー処理異常",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "example": {
+                      "error": "Internal server error"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "components": {
+        "securitySchemes": {
+          "ApiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key",
+            "description": "API Gateway APIキー"
+          }
+        },
+        "schemas": {
+          "Reservation": {
+            "type": "object",
+            "properties": {
+              "reservation_id": {
+                "type": "string",
+                "description": "配車予約ID"
+              },
+              "departure_platform_name": {
+                "type": "string",
+                "description": "出発地名"
+              },
+              "departure_time": {
+                "type": "string",
+                "format": "date-time",
+                "description": "出発時刻"
+              },
+              "arrival_platform_name": {
+                "type": "string",
+                "description": "到着地名"
+              },
+              "arrival_time": {
+                "type": "string",
+                "format": "date-time",
+                "description": "到着時刻"
+              },
+              "reservation_type": {
+                "type": "integer",
+                "enum": [1, 2, 3, 4],
+                "description": "予約タイプ\n- 1: 行き（ご自宅→病院）\n- 2: 立ち寄り先なしの帰り（病院→ご自宅）\n- 3: 立ち寄り先ありの帰り・立ち寄り先まで（病院→立ち寄り場所）\n- 4: 立ち寄り先ありの帰り・自宅まで（立ち寄り場所→ご自宅）"
+              }
+            }
+          },
+          "Error": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string",
+                "description": "エラーメッセージ"
+              }
+            }
+          }
+        }
+      }
+    };
+
+    Redoc.init(spec, {
+      scrollYOffset: 50,
+      hideDownloadButton: false
+    }, document.getElementById('redoc-container'));
+  </script>
+</body>
+
+</html>

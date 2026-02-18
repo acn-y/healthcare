@@ -1,0 +1,331 @@
+openapi: 3.0.3
+info:
+  title: HealthcareMaaS Gateway Reservations API
+  description: |-
+    デマンドバスシステム標準化APIと連携し、病院への往路・復路の配車予約管理機能を提供する、ヘルスケアMaaSゲートウェイAPIです。
+  version: 1.0.0
+servers:
+  - url: https://{api_id}.execute-api.ap-northeast-1.amazonaws.com/{stage}
+    description: AWS API Gateway
+    variables:
+      api_id:
+        default: xxxxxxxxxx
+        description: API Gateway ID
+      stage:
+        default: dev
+        description: デプロイステージ
+paths:
+  /reservations:
+    post:
+      tags:
+        - reservations
+      summary: 配車予約検索・確定API
+      description: |-
+        配車予約を検索し、確定します。
+
+        - 到着希望日時（診察日時）を到着予定時刻とした行きの予約（ご自宅→病院）の予約を確定
+        - 出発希望日時（離院日時）を出発予定時刻とした帰りの予約（病院→ご自宅）の予約を確定
+        - 立ち寄り場所を指定した場合、立ち寄り場所を中継地点として考慮した予約を確定（病院→立ち寄り場所→ご自宅）
+      operationId: createReservation
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/CreateReservationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ReservationsListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+        - reservations
+      summary: 配車予約変更API
+      description: |-
+        確定済みの配車予約の内容を変更します。
+
+        既存の予約をキャンセルし、新しい条件で予約を再作成します。
+        変更可能な項目：
+        - 行きの予約
+        - 帰りの予約
+        - 立ち寄り場所
+        - 立ち寄り場所の滞在時間
+      operationId: updateReservation
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/UpdateReservationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ReservationsListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - reservations
+      summary: 配車予約キャンセルAPI
+      description: |-
+        配車予約をキャンセルします。
+
+        診察キャンセル時に紐づく配車予約をキャンセルするために使用します。
+        1回の診察で最大3つの予約（往路、復路1、復路2）があるため、それらを一括でキャンセルできます。
+      operationId: deleteReservation
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        $ref: "#/components/requestBodies/DeleteReservationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/NoContent"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API Gateway APIキー
+
+  requestBodies:
+    CreateReservationRequest:
+      description: 配車予約作成リクエスト
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - user_id
+            properties:
+              user_id:
+                $ref: "#/components/schemas/user_id"
+              arrival_demand_time:
+                $ref: "#/components/schemas/arrival_demand_time"
+              departure_demand_time:
+                $ref: "#/components/schemas/departure_demand_time"
+              way_points_id:
+                $ref: "#/components/schemas/way_points_id"
+              stay_duration_minutes:
+                $ref: "#/components/schemas/stay_duration_minutes"
+          example:
+            user_id: "123456"
+            arrival_demand_time: "2025-07-03T10:15:30+09:00"
+            departure_demand_time: "2025-07-03T15:15:30+09:00"
+            way_points_id: 1
+            stay_duration_minutes: 30
+
+    UpdateReservationRequest:
+      description: 配車予約変更リクエスト
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - user_id
+              - reservation_ids
+            properties:
+              user_id:
+                $ref: "#/components/schemas/user_id"
+              reservation_ids:
+                $ref: "#/components/schemas/reservation_ids"
+              arrival_demand_time:
+                $ref: "#/components/schemas/arrival_demand_time"
+              departure_demand_time:
+                $ref: "#/components/schemas/departure_demand_time"
+              way_points_id:
+                $ref: "#/components/schemas/way_points_id"
+              stay_duration_minutes:
+                $ref: "#/components/schemas/stay_duration_minutes"
+          example:
+            user_id: "123456"
+            reservation_ids: [111111, 111112]
+            arrival_demand_time: "2025-07-03T11:15:30+09:00"
+            departure_demand_time: "2025-07-03T16:15:30+09:00"
+            way_points_id: 2
+            stay_duration_minutes: 45
+
+    DeleteReservationRequest:
+      description: 配車予約キャンセルリクエスト
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - user_id
+              - reservation_ids
+            properties:
+              user_id:
+                $ref: "#/components/schemas/user_id"
+              reservation_ids:
+                $ref: "#/components/schemas/reservation_ids"
+          example:
+            user_id: "123456"
+            reservation_ids: [111111, 111112, 111113]
+
+  responses:
+    ReservationsListResponse:
+      description: 予約一覧レスポンス
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reservations_list:
+                type: array
+                description: |-
+                  予約情報の配列。
+                  立ち寄り場所がリクエストに含まれている場合は最大3件、含まれていない場合は最大2件の予約を返却。
+                items:
+                  $ref: "#/components/schemas/Reservation"
+          example:
+            reservations_list:
+              - reservation_id: "111111"
+                departure_platform_name: "ご自宅"
+                departure_time: "2025-07-03T09:15:30+09:00"
+                arrival_platform_name: "徳島県県立中央病院"
+                arrival_time: "2025-07-03T10:00:00+09:00"
+                reservation_type: 1
+              - reservation_id: "111112"
+                departure_platform_name: "徳島県県立中央病院"
+                departure_time: "2025-07-03T15:15:30+09:00"
+                arrival_platform_name: "ひかり薬局 城東店"
+                arrival_time: "2025-07-03T15:45:00+09:00"
+                reservation_type: 3
+              - reservation_id: "111113"
+                departure_platform_name: "ひかり薬局 城東店"
+                departure_time: "2025-07-03T16:15:00+09:00"
+                arrival_platform_name: "ご自宅"
+                arrival_time: "2025-07-03T16:45:00+09:00"
+                reservation_type: 4
+
+    NoContent:
+      description: 正常応答（ボディなし）
+
+    BadRequest:
+      description: Bad Request - パラメータ不正
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "user_id is required and must be a string"
+
+    NotFound:
+      description: Not Found - 指定されたリソースなし
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Reservation not found: 111111"
+
+    InternalServerError:
+      description: Internal Server Error - サーバー処理異常
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Internal server error"
+
+  schemas:
+    user_id:
+      type: string
+      description: |-
+        利用者ID（PHRシステムにおける患者IDを想定）
+      example: "123456"
+
+    arrival_demand_time:
+      type: string
+      format: date-time
+      description: |-
+        到着希望日時（ISO8601形式）。
+        この時刻に到着するように行きの予約（ご自宅→病院）を確定します。
+        未来の日時を指定する必要があります。
+      example: "2025-07-03T10:15:30+09:00"
+
+    departure_demand_time:
+      type: string
+      format: date-time
+      description: |-
+        出発希望日時（ISO8601形式）。
+        この時刻に出発するように帰りの予約（病院→ご自宅）を確定します。
+        未来の日時を指定する必要があります。
+      example: "2025-07-03T15:15:30+09:00"
+
+    way_points_id:
+      type: integer
+      description: |-
+        立ち寄り場所の内部コードID。
+        指定した場合、帰りの予約が「病院→立ち寄り場所→ご自宅」の2つに分割されます。
+      example: 1
+
+    stay_duration_minutes:
+      type: integer
+      description: |-
+        立ち寄り場所での滞在時間（分）。
+        way_points_idと併用する必要があります。
+      example: 30
+
+    reservation_ids:
+      type: array
+      items:
+        type: integer
+      minItems: 1
+      maxItems: 3
+      description: |-
+        対象の配車予約IDリスト。
+        1回の診察で最大3つの予約（往路、復路1、復路2）があるため、1〜3件のIDを指定できます。
+      example: [111111, 111112, 111113]
+
+    Reservation:
+      type: object
+      properties:
+        reservation_id:
+          type: string
+          description: 配車予約ID
+        departure_platform_name:
+          type: string
+          description: 出発地名
+        departure_time:
+          type: string
+          format: date-time
+          description: 出発時刻
+        arrival_platform_name:
+          type: string
+          description: 到着地名
+        arrival_time:
+          type: string
+          format: date-time
+          description: 到着時刻
+        reservation_type:
+          type: integer
+          enum: [1, 2, 3, 4]
+          description: |-
+            予約タイプ
+            - 1: 行き（ご自宅→病院）
+            - 2: 立ち寄り先なしの帰り（病院→ご自宅）
+            - 3: 立ち寄り先ありの帰り・立ち寄り先まで（病院→立ち寄り場所）
+            - 4: 立ち寄り先ありの帰り・自宅まで（立ち寄り場所→ご自宅）
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: エラーメッセージ
