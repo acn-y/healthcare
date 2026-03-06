@@ -21,7 +21,7 @@
       "openapi": "3.0.3",
       "info": {
         "title": "HealthcareMaaS Gateway Reservations API",
-        "description": "デマンドバスシステム標準化APIと連携し、病院への往路・復路の配車予約管理機能を提供する、ヘルスケアMaaSゲートウェイAPIです。",
+        "description": "デマンドバスシステム連携API標準仕様書(1.0.0) | COMmmmONS[コモンズ]と連携し、病院への往路・復路の配車予約管理機能を提供する、ヘルスケアMaaSゲートウェイAPIです。",
         "version": "1.0.0"
       },
       "servers": [
@@ -106,7 +106,7 @@
                       "properties": {
                         "reservations_list": {
                           "type": "array",
-                          "description": "予約情報の配列。立ち寄り場所がリクエストに含まれている場合は最大3件、含まれていない場合は最大2件の予約を返却。",
+                          "description": "予約情報の配列。立ち寄り場所がリクエストに含まれている場合は最大3件、含まれていない場合は最大2件の予約を返却します。",
                           "items": {
                             "$ref": "#/components/schemas/Reservation"
                           }
@@ -188,7 +188,7 @@
           "patch": {
             "tags": ["reservations"],
             "summary": "配車予約変更API",
-            "description": "確定済みの配車予約の内容を変更します。\n\n既存の予約をキャンセルし、新しい条件で予約を再作成します。\n変更可能な項目：\n- 行きの予約\n- 帰りの予約\n- 立ち寄り場所\n- 立ち寄り場所の滞在時間",
+            "description": "確定済みの配車予約の内容を変更します。\n\n既存の予約をキャンセルし、新しい条件で予約を再作成します。\n\n変更可能な項目：\n- 行きの予約\n- 帰りの予約\n- 立ち寄り場所\n- 立ち寄り場所の滞在時間",
             "operationId": "updateReservation",
             "security": [{"ApiKeyAuth": []}],
             "requestBody": {
@@ -340,7 +340,7 @@
           "delete": {
             "tags": ["reservations"],
             "summary": "配車予約キャンセルAPI",
-            "description": "配車予約をキャンセルします。\n\n診察キャンセル時に紐づく配車予約をキャンセルするために使用します。\n1回の診察で最大3つの予約（往路、復路1、復路2）があるため、それらを一括でキャンセルできます。",
+            "description": "配車予約をキャンセルします。\n\n診察キャンセル時に紐づく配車予約をキャンセルするために使用します。\n1回の診察に対して最大3つの予約（往路、復路1、復路2）があるため、それらを一括でキャンセルできます。",
             "operationId": "deleteReservation",
             "security": [{"ApiKeyAuth": []}],
             "requestBody": {
